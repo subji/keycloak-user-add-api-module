@@ -4,11 +4,11 @@ import requests
 import configparser
 
 config = configparser.ConfigParser()
-config.read('boilerplate.ini')
+config.read('configuration.ini')
 
 # Return DB Connection
 def getConnection():
-  db = pymysql.connect(host=config['DB']['HOST'], port=3306, user=['DB']['USERNAME'], passwd=['DB']['PASSWORD'], db=['DB']['DB'], charset='utf8', autocommit=False)
+  db = pymysql.connect(host=config['DB']['HOST'], port=3306, user=config['DB']['USERNAME'], passwd=config['DB']['PASSWORD'], db=config['DB']['DB'], charset='utf8', autocommit=False)
 
   return db;
 
