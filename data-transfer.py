@@ -2,6 +2,7 @@ import pymysql
 import requests
 import json
 
+# Return DB Connection
 def getConnection():
   db = pymysql.connect(host = '{host}', port=3306, user='{username}', passwd='{password}', db='{database name}', charset='utf8', autocommit=False)
   cursor = db.cursor()
@@ -13,6 +14,18 @@ def getConnection():
 
   return db;
 
+# Get AccessToken from keycloak
+def getToken():
+  tokenUrl = 'http://localhost:8080/auth/realms/{realm name}/protocol/openid-connect/token'
+
+  res = requests.post(tokenUrl, data={ 
+    'grant_type': 'client_credentials',
+    'client_id': '{client id}', 
+    'client_secret': '{client secret}' })
+
+  return res.json()['access_token']
+
+# Generate body 
 def makeBody():
   db = getConnection()
 
@@ -21,7 +34,7 @@ def makeBody():
 
   for i, d in enumerate(cursor.fetchall()):
     if i == 0:
-      param = { 'username': None, 'enabled': 'false' }
+      param = { 'username': '', 'enabled': 'false' }
       attr = {
         'userSeq': d[0],
         'userLoginPlatformType': d[2],
@@ -37,30 +50,28 @@ def makeBody():
         'userJoinPathCodeSeq': d[13],
         'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
       }
-      credential = [{
-        'type': 'password',
-        'value': d[3] if d[3] != None else ''
-      }]
+      credential = [{ 'type': 'password', 'value': d[3] }]
 
       param['attributes'] = attr;
-      param['username'] = str(d[0]) if d[1] is None else d[1]
-      param['credentials'] = credential
+      param['username'] = str(d[1])
       param['enabled'] = 'false' if d[11] == 'Y' else 'true'
 
+      if d[3] != None:
+        param['credentials'] = credential
+
+      accessToken = getToken()
+
       print(param)
+      print()
+      print(accessToken[0:10] + '...')
 
-      addUser(param)
+      addUser(param, 'bearer ' + accessToken)
 
-def addUser(param):
-  headers = {
-    'Content-Type': 'application/json; charset=utf-8', 
-    'Authorization': 'bearer {token}'
-  }
+# Call Keycloak Add user api 
+def addUser(param, token):
+  headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
 
-  res = requests.post(
-    'http://localhost:8080/auth/admin/realms/{realm name}/users', 
-    data=json.dumps(param), 
-    headers=headers)
+  res = requests.post('http://localhost:8080/auth/admin/realms/{realm name}/users', data=json.dumps(param), headers=headers)
 
   print(res.status_code)
   print(res.text)
