@@ -1,27 +1,25 @@
+import json
 import pymysql
 import requests
-import json
+import configparser
+
+config = configparser.ConfigParser()
+config.read('boilerplate.ini')
 
 # Return DB Connection
 def getConnection():
-  db = pymysql.connect(host = '{host}', port=3306, user='{username}', passwd='{password}', db='{database name}', charset='utf8', autocommit=False)
-  cursor = db.cursor()
-  cursor.execute('SELECT VERSION()')
-
-  version = cursor.fetchone()
-
-  print('Database version is: %s' % version)
+  db = pymysql.connect(host=config['DB']['HOST'], port=3306, user=['DB']['USERNAME'], passwd=['DB']['PASSWORD'], db=['DB']['DB'], charset='utf8', autocommit=False)
 
   return db;
 
 # Get AccessToken from keycloak
 def getToken():
-  tokenUrl = 'http://localhost:8080/auth/realms/{realm name}/protocol/openid-connect/token'
+  tokenUrl = 'http://localhost:8080/auth/realms/' + config['KEYCLOAK']['REALM'] + '/protocol/openid-connect/token'
 
   res = requests.post(tokenUrl, data={ 
     'grant_type': 'client_credentials',
-    'client_id': '{client id}', 
-    'client_secret': '{client secret}' })
+    'client_id': config['KEYCLOAK']['CLIENT_ID'], 
+    'client_secret': config['KEYCLOAK']['CLIENT_SECRET'] })
 
   return res.json()['access_token']
 
@@ -70,11 +68,11 @@ def makeBody():
 # Call Keycloak Add user api 
 def addUser(param, token):
   headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
+  apiUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users'
 
-  res = requests.post('http://localhost:8080/auth/admin/realms/{realm name}/users', data=json.dumps(param), headers=headers)
+  res = requests.post(apiUrl, data=json.dumps(param), headers=headers)
 
   print(res.status_code)
-  print(res.text)
 
-if __name__ == '__main__':
+if __name__ == '__main__':  
   makeBody()
