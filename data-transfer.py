@@ -31,39 +31,38 @@ def makeBody():
   cursor.execute('SELECT * FROM T_USER')
 
   for i, d in enumerate(cursor.fetchall()):
-    if i == 0:
-      param = { 'username': '', 'enabled': 'false' }
-      attr = {
-        'userSeq': d[0],
-        'userLoginPlatformType': d[2],
-        'userEmail': d[4],
-        'userNickname': d[5],
-        'userEmailReceivedYn': d[6],
-        'duplicateLoginYn': d[7],
-        'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S'),
-        'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S'),
-        'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S'),
-        'delYn': d[11],
-        'lastLoginAttemptCount': d[12],
-        'userJoinPathCodeSeq': d[13],
-        'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
-      }
-      credential = [{ 'type': 'password', 'value': d[3] }]
+    param = { 'username': '', 'enabled': 'false' }
+    attr = {
+      'userSeq': d[0],
+      'userLoginPlatformType': d[2],
+      'userEmail': d[4],
+      'userNickname': d[5],
+      'userEmailReceivedYn': d[6],
+      'duplicateLoginYn': d[7],
+      'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
+      'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
+      'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
+      'delYn': d[11],
+      'lastLoginAttemptCount': d[12],
+      'userJoinPathCodeSeq': d[13],
+      'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
+    }
+    credential = [{ 'type': 'password', 'value': d[3] }]
 
-      param['attributes'] = attr;
-      param['username'] = str(d[1])
-      param['enabled'] = 'false' if d[11] == 'Y' else 'true'
+    param['attributes'] = attr;
+    param['username'] = str(d[0]) + '(none)' if d[1] == None else d[1]
+    param['enabled'] = 'false' if d[11] == 'Y' else 'true'
 
-      if d[3] != None:
-        param['credentials'] = credential
+    if d[3] != None:
+      param['credentials'] = credential
 
-      accessToken = getToken()
+    accessToken = getToken()
 
-      print(param)
-      print()
-      print(accessToken[0:10] + '...')
+    print(param)
+    print()
+    print(accessToken[0:10] + '...')
 
-      addUser(param, 'bearer ' + accessToken)
+    addUser(param, 'bearer ' + accessToken)
 
 # Call Keycloak Add user api 
 def addUser(param, token):
