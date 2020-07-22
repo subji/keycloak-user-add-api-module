@@ -60,6 +60,7 @@ def makeBody():
   }
 
   for i, d in enumerate(cursor.fetchall()):
+    # if i == 1:
     param = { 'username': '', 'enabled': 'false' }
 
     attr = {
@@ -90,6 +91,8 @@ def makeBody():
     # add credential if it exist
     if d[3] != None:
       param['credentials'] = [{'type': 'password', 'value': d[3]}]
+
+      print('\ncredential: ', d[3], '\n')
 
     print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
