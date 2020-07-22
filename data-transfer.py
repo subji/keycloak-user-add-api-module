@@ -3,6 +3,8 @@ import pymysql
 import requests
 import configparser
 
+from requests.api import head, request
+
 config = configparser.ConfigParser()
 config.read('configuration.ini')
 
@@ -23,6 +25,17 @@ def getToken():
 
   return res.json()['access_token']
 
+# Get User Id for Role Mapping
+def getUserId(username, token):
+  headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
+  userUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users'
+
+  res = requests.get(userUrl, params={ 'username': username }, headers=headers)
+
+  print(res.json())
+
+  return res.json()[0]['id']
+
 # Generate body 
 def makeBody():
   db = getConnection()
@@ -39,52 +52,77 @@ def makeBody():
          GROUP BY am.user_seq
       ) a on u.user_seq=a.user_seq
   """)
+  accessToken = getToken()
+
+  roles = {
+    'ADMIN': '2d3f5a63-e234-4e66-beee-719daf2e3c33',
+    'USER': '362c349f-99cd-4f1c-bcfc-b6aa484b7316'
+  }
 
   for i, d in enumerate(cursor.fetchall()):
-    param = { 'username': '', 'enabled': 'false' }
+    if i == 1:
+      param = { 'username': '', 'enabled': 'false' }
 
-    attr = {
-      'delYn': d[11],
-      'userSeq': d[0],
-      'userNickname': d[5],
-      'duplicateLoginYn': d[7],
-      'userEmailReceivedYn': d[6],
-      'userJoinPathCodeSeq': d[13],
-      'userLoginPlatformType': d[2],
-      'lastLoginAttemptCount': d[12],
-      'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
-      'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
-      'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
-      'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
-    }
+      attr = {
+        'delYn': d[11],
+        'userSeq': d[0],
+        'userNickname': d[5],
+        'duplicateLoginYn': d[7],
+        'userEmailReceivedYn': d[6],
+        'userJoinPathCodeSeq': d[13],
+        'userLoginPlatformType': d[2],
+        'lastLoginAttemptCount': d[12],
+        'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
+        'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
+        'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
+        'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
+      }
 
-    param['attributes'] = attr
-    param['realmRoles'] = list(set(d[16].split(',')))
-    param['enabled'] = 'false' if d[11] == 'Y' else 'true'
-    param['username'] = str(d[0]) + '(none)' if d[1] == None else d[1]
+      username = str(d[0]) + '(none)' if d[1] == None else d[1]
 
-    # add email if it exist
-    if d[4] != None:
-      param['email'] = d[4]
-      
-    # add credential if it exist
-    if d[3] != None:
-      param['credentials'] = [{'type': 'password', 'value': d[3]}]
+      param['attributes'] = attr
+      param['username'] = username
+      param['enabled'] = 'false' if d[11] == 'Y' else 'true'
 
-    accessToken = getToken()
+      # add email if it exist
+      if d[4] != None:
+        param['email'] = d[4]
+        
+      # add credential if it exist
+      if d[3] != None:
+        param['credentials'] = [{'type': 'password', 'value': d[3]}]
 
-    print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
+      print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
-    addUser(param, 'bearer ' + accessToken)
+      try:
+        addUser(param, [{ 'name': str(r).lower(), 'id': roles[r if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
+      except Exception as e:
+        print(e)
 
 # Call Keycloak Add user api 
-def addUser(param, token):
+def addUser(param, roles, token):
   headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
   apiUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users'
 
   res = requests.post(apiUrl, data=json.dumps(param), headers=headers)
 
   print('\n(' + str(res.status_code) + ') ' + res.text + '\n')
+
+  if res.ok:
+    userId = getUserId(param['username'], token)
+    addRole(userId, roles, token)
+
+# Add Role Mapping
+def addRole(userId, param, token):
+  headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
+  roleUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users/' + userId + '/role-mappings/realm'
+
+  print('\nRoles: ', param, '\n')
+
+  res = requests.post(roleUrl, data=json.dumps(param), headers=headers)
+  
+  print('\n(' + str(res.status_code) + ') ' + res.text + '\n')
+  
 
 if __name__ == '__main__':  
   makeBody()
