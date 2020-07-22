@@ -55,8 +55,8 @@ def makeBody():
   accessToken = getToken()
 
   roles = {
-    'ADMIN': '2d3f5a63-e234-4e66-beee-719daf2e3c33',
-    'USER': '362c349f-99cd-4f1c-bcfc-b6aa484b7316'
+    'ADMIN': '50dd5834-eea1-4429-ab76-b901325564cd',
+    'USER': '25668ba9-9b1e-4fa3-9864-597c34eef8dd'
   }
 
   for i, d in enumerate(cursor.fetchall()):
@@ -97,7 +97,10 @@ def makeBody():
     print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
     try:
-      addUser(param, [{ 'name': str(r).lower(), 'id': roles[r if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
+      addUser(param, [{ 
+        'name': r, 
+        'containerId': '434aec89-f0d7-4ba2-806f-440592d508a1',
+        'id': roles[r if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
     except Exception as e:
       print(e)
 
@@ -117,7 +120,7 @@ def addUser(param, roles, token):
 # Add Role Mapping
 def addRole(userId, param, token):
   headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
-  roleUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users/' + userId + '/role-mappings/realm'
+  roleUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users/' + userId + '/role-mappings/clients/' + config['KEYCLOAK']['CLIENT']
 
   print('\nRoles: ', param, '\n')
 
