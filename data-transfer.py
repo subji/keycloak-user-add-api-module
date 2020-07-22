@@ -28,39 +28,52 @@ def makeBody():
   db = getConnection()
 
   cursor = db.cursor()
-  cursor.execute('SELECT * FROM T_USER')
+  cursor.execute("""
+    SELECT *
+      FROM T_USER u 
+      LEFT JOIN (
+        SELECT am.user_seq,
+               GROUP_CONCAT(at.authority_type SEPARATOR ',') AS roles
+          FROM T_AUTHORITIES_MAPPING am
+          LEFT JOIN T_AUTHORITIES_TYPE at on am.authority_type_seq=at.authority_type_seq
+         GROUP BY am.user_seq
+      ) a on u.user_seq=a.user_seq
+  """)
 
   for i, d in enumerate(cursor.fetchall()):
     param = { 'username': '', 'enabled': 'false' }
+
     attr = {
-      'userSeq': d[0],
-      'userLoginPlatformType': d[2],
-      'userEmail': d[4],
-      'userNickname': d[5],
-      'userEmailReceivedYn': d[6],
-      'duplicateLoginYn': d[7],
-      'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
-      'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
-      'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
       'delYn': d[11],
-      'lastLoginAttemptCount': d[12],
+      'userSeq': d[0],
+      'userNickname': d[5],
+      'duplicateLoginYn': d[7],
+      'userEmailReceivedYn': d[6],
       'userJoinPathCodeSeq': d[13],
+      'userLoginPlatformType': d[2],
+      'lastLoginAttemptCount': d[12],
+      'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
+      'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
+      'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
       'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
     }
-    credential = [{ 'type': 'password', 'value': d[3] }]
 
-    param['attributes'] = attr;
-    param['username'] = str(d[0]) + '(none)' if d[1] == None else d[1]
+    param['attributes'] = attr
+    param['realmRoles'] = list(set(d[16].split(',')))
     param['enabled'] = 'false' if d[11] == 'Y' else 'true'
+    param['username'] = str(d[0]) + '(none)' if d[1] == None else d[1]
 
+    # add email if it exist
+    if d[4] != None:
+      param['email'] = d[4]
+      
+    # add credential if it exist
     if d[3] != None:
-      param['credentials'] = credential
+      param['credentials'] = [{'type': 'password', 'value': d[3]}]
 
     accessToken = getToken()
 
-    print(param)
-    print()
-    print(accessToken[0:10] + '...')
+    print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
     addUser(param, 'bearer ' + accessToken)
 
@@ -71,7 +84,7 @@ def addUser(param, token):
 
   res = requests.post(apiUrl, data=json.dumps(param), headers=headers)
 
-  print(res.status_code)
+  print('\n(' + str(res.status_code) + ') ' + res.text + '\n')
 
 if __name__ == '__main__':  
   makeBody()
