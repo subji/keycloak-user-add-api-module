@@ -60,44 +60,43 @@ def makeBody():
   }
 
   for i, d in enumerate(cursor.fetchall()):
-    if i == 1:
-      param = { 'username': '', 'enabled': 'false' }
+    param = { 'username': '', 'enabled': 'false' }
 
-      attr = {
-        'delYn': d[11],
-        'userSeq': d[0],
-        'userNickname': d[5],
-        'duplicateLoginYn': d[7],
-        'userEmailReceivedYn': d[6],
-        'userJoinPathCodeSeq': d[13],
-        'userLoginPlatformType': d[2],
-        'lastLoginAttemptCount': d[12],
-        'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
-        'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
-        'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
-        'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
-      }
+    attr = {
+      'delYn': d[11],
+      'userSeq': d[0],
+      'userNickname': d[5],
+      'duplicateLoginYn': d[7],
+      'userEmailReceivedYn': d[6],
+      'userJoinPathCodeSeq': d[13],
+      'userLoginPlatformType': d[2],
+      'lastLoginAttemptCount': d[12],
+      'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
+      'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
+      'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
+      'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
+    }
 
-      username = str(d[0]) + '(none)' if d[1] == None else d[1]
+    username = str(d[0]) + '(none)' if d[1] == None else d[1]
 
-      param['attributes'] = attr
-      param['username'] = username
-      param['enabled'] = 'false' if d[11] == 'Y' else 'true'
+    param['attributes'] = attr
+    param['username'] = username
+    param['enabled'] = 'false' if d[11] == 'Y' else 'true'
 
-      # add email if it exist
-      if d[4] != None:
-        param['email'] = d[4]
-        
-      # add credential if it exist
-      if d[3] != None:
-        param['credentials'] = [{'type': 'password', 'value': d[3]}]
+    # add email if it exist
+    if d[4] != None:
+      param['email'] = d[4]
+      
+    # add credential if it exist
+    if d[3] != None:
+      param['credentials'] = [{'type': 'password', 'value': d[3]}]
 
-      print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
+    print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
-      try:
-        addUser(param, [{ 'name': str(r).lower(), 'id': roles[r if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
-      except Exception as e:
-        print(e)
+    try:
+      addUser(param, [{ 'name': str(r).lower(), 'id': roles[r if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
+    except Exception as e:
+      print(e)
 
 # Call Keycloak Add user api 
 def addUser(param, roles, token):
