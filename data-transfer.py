@@ -32,7 +32,7 @@ def getUserId(username, token):
 
   res = requests.get(userUrl, params={ 'username': username }, headers=headers)
 
-  print(res.json())
+  print('\nGet User Id (', res.status_code, ') ', res.json(), '\n')
 
   return res.json()[0]['id']
 
@@ -69,13 +69,10 @@ def makeBody():
     param = { 'username': '', 'enabled': 'false' }
 
     attr = {
-      'delYn': d[11],
       'userSeq': d[0],
       'userNickname': d[5],
-      'duplicateLoginYn': d[7],
       'userEmailReceivedYn': d[6],
       'userJoinPathCodeSeq': d[13],
-      'userLoginPlatformType': d[2],
       'lastLoginAttemptCount': d[12],
       'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
       'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
@@ -88,6 +85,12 @@ def makeBody():
     param['attributes'] = attr
     param['username'] = username
     param['enabled'] = 'false' if d[11] == 'Y' else 'true'
+    
+    # identityProvider is none then NullPointerException
+    if d[2] != 'local' and d[2] != None:
+      param['federatedIdentities'] = [{
+        'identityProvider': d[2]
+      }]
 
     # add email if it exist
     if d[4] != None:
@@ -97,17 +100,12 @@ def makeBody():
     if d[3] != None:
       param['credentials'] = [{'type': 'password', 'value': d[3]}]
 
-      print('\ncredential: ', d[3], '\n')
-
     print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
-    try:
-      addUser(param, [{ 
-        'name': roleName[r], 
-        'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10',
-        'id': roles[roleName[r] if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
-    except Exception as e:
-      print(e)
+    addUser(param, [{ 
+      'name': roleName[r], 
+      'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10',
+      'id': roles[roleName[r] if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
 
 # Call Keycloak Add user api 
 def addUser(param, roles, token):
@@ -131,7 +129,7 @@ def addRole(userId, param, token):
 
   res = requests.post(roleUrl, data=json.dumps(param), headers=headers)
   
-  print('\n(' + str(res.status_code) + ') ' + res.text + '\n')
+  print('\nAdd Role (', str(res.status_code), ') ', res.text, '\n')
   
 
 if __name__ == '__main__':  
