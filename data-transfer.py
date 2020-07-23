@@ -50,8 +50,10 @@ def makeBody():
       }
       credential = [{ 'type': 'password', 'value': d[3] }]
 
+      print(d[1], d[1] if d[1] != None else 'ss')
+
       param['attributes'] = attr;
-      param['username'] = str(d[1])
+      param['username'] = d[1] if d[1] != None else ''
       param['enabled'] = 'false' if d[11] == 'Y' else 'true'
 
       if d[3] != None:
@@ -72,7 +74,7 @@ def addUser(param, token):
 
   res = requests.post(apiUrl, data=json.dumps(param), headers=headers)
 
-  print(res.status_code)
+  print('(' + str(res.status_code) + ') ' + res.text)
 
 if __name__ == '__main__':  
   makeBody()
