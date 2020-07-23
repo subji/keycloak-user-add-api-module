@@ -3,6 +3,8 @@ import pymysql
 import requests
 import configparser
 
+from requests.api import head, request
+
 config = configparser.ConfigParser()
 config.read('configuration.ini')
 
@@ -23,58 +25,114 @@ def getToken():
 
   return res.json()['access_token']
 
+# Get User Id for Role Mapping
+def getUserId(username, token):
+  headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
+  userUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users'
+
+  res = requests.get(userUrl, params={ 'username': username }, headers=headers)
+
+  print(res.json())
+
+  return res.json()[0]['id']
+
 # Generate body 
 def makeBody():
   db = getConnection()
 
   cursor = db.cursor()
-  cursor.execute('SELECT * FROM T_USER')
+  cursor.execute("""
+    SELECT *
+      FROM T_USER u 
+      LEFT JOIN (
+        SELECT am.user_seq,
+               GROUP_CONCAT(at.authority_type SEPARATOR ',') AS roles
+          FROM T_AUTHORITIES_MAPPING am
+          LEFT JOIN T_AUTHORITIES_TYPE at on am.authority_type_seq=at.authority_type_seq
+         GROUP BY am.user_seq
+      ) a on u.user_seq=a.user_seq
+  """)
+  accessToken = getToken()
+
+  roles = {
+    'MASTER_ADMIN': '2ce4b4cd-34fe-4e99-9d32-e050695e8c4f',
+    'NORMAL_USER': '2a3d6b29-4e22-42ab-9a4f-8df307ab55fe'
+  }
+
+  roleName = {
+    'ADMIN': 'MASTER_ADMIN', 
+    'USER': 'NORMAL_USER',
+  }
 
   for i, d in enumerate(cursor.fetchall()):
-    if i == 0:
-      param = { 'username': '', 'enabled': 'false' }
-      attr = {
-        'userSeq': d[0],
-        'userLoginPlatformType': d[2],
-        'userEmail': d[4],
-        'userNickname': d[5],
-        'userEmailReceivedYn': d[6],
-        'duplicateLoginYn': d[7],
-        'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S'),
-        'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S'),
-        'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S'),
-        'delYn': d[11],
-        'lastLoginAttemptCount': d[12],
-        'userJoinPathCodeSeq': d[13],
-        'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
-      }
-      credential = [{ 'type': 'password', 'value': d[3] }]
+    # if i == 1:
+    param = { 'username': '', 'enabled': 'false' }
 
-      print(d[1], d[1] if d[1] != None else 'ss')
+    attr = {
+      'delYn': d[11],
+      'userSeq': d[0],
+      'userNickname': d[5],
+      'duplicateLoginYn': d[7],
+      'userEmailReceivedYn': d[6],
+      'userJoinPathCodeSeq': d[13],
+      'userLoginPlatformType': d[2],
+      'lastLoginAttemptCount': d[12],
+      'deleteDate': d[9].strftime('%m/%d/%Y, %H:%M:%S') if d[9] != None else None,
+      'registerDate': d[8].strftime('%m/%d/%Y, %H:%M:%S') if d[8] != None else None,
+      'updateDate': d[10].strftime('%m/%d/%Y, %H:%M:%S') if d[10] != None else None,
+      'userJoinPathRegisterDate': d[14].strftime('%m/%d/%Y, %H:%M:%S') if d[14] != None else ''
+    }
 
-      param['attributes'] = attr;
-      param['username'] = d[1] if d[1] != None else ''
-      param['enabled'] = 'false' if d[11] == 'Y' else 'true'
+    username = str(d[0]) + '(none)' if d[1] == None else d[1]
 
-      if d[3] != None:
-        param['credentials'] = credential
+    param['attributes'] = attr
+    param['username'] = username
+    param['enabled'] = 'false' if d[11] == 'Y' else 'true'
 
-      accessToken = getToken()
+    # add email if it exist
+    if d[4] != None:
+      param['email'] = d[4]
+      
+    # add credential if it exist
+    if d[3] != None:
+      param['credentials'] = [{'type': 'password', 'value': d[3]}]
 
-      print(param)
-      print()
-      print(accessToken[0:10] + '...')
+      print('\ncredential: ', d[3], '\n')
 
-      addUser(param, 'bearer ' + accessToken)
+    print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
+
+    try:
+      addUser(param, [{ 
+        'name': roleName[r], 
+        'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10',
+        'id': roles[roleName[r] if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
+    except Exception as e:
+      print(e)
 
 # Call Keycloak Add user api 
-def addUser(param, token):
+def addUser(param, roles, token):
   headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
   apiUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users'
 
   res = requests.post(apiUrl, data=json.dumps(param), headers=headers)
 
-  print('(' + str(res.status_code) + ') ' + res.text)
+  print('\n(' + str(res.status_code) + ') ' + res.text + '\n')
+
+  if res.ok:
+    userId = getUserId(param['username'], token)
+    addRole(userId, roles, token)
+
+# Add Role Mapping
+def addRole(userId, param, token):
+  headers = { 'Content-Type': 'application/json; charset=utf-8', 'Authorization': token }
+  roleUrl = 'http://localhost:8080/auth/admin/realms/' + config['KEYCLOAK']['REALM'] + '/users/' + userId + '/role-mappings/clients/' + config['KEYCLOAK']['CLIENT']
+
+  print('\nRoles: ', param, '\n')
+
+  res = requests.post(roleUrl, data=json.dumps(param), headers=headers)
+  
+  print('\n(' + str(res.status_code) + ') ' + res.text + '\n')
+  
 
 if __name__ == '__main__':  
   makeBody()
