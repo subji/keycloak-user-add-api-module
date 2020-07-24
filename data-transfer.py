@@ -54,16 +54,6 @@ def makeBody():
   """)
   accessToken = getToken()
 
-  roles = {
-    'MASTER_ADMIN': '2ce4b4cd-34fe-4e99-9d32-e050695e8c4f',
-    'NORMAL_USER': '2a3d6b29-4e22-42ab-9a4f-8df307ab55fe'
-  }
-
-  roleName = {
-    'ADMIN': 'MASTER_ADMIN', 
-    'USER': 'NORMAL_USER',
-  }
-
   for i, d in enumerate(cursor.fetchall()):
     # if i == 1:
     param = { 'username': '', 'enabled': 'false' }
@@ -102,10 +92,36 @@ def makeBody():
 
     print('\ntoken: ', accessToken[0:10] + '...\nparam: ', param, '\n')
 
-    addUser(param, [{ 
-      'name': roleName[r], 
-      'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10',
-      'id': roles[roleName[r] if r != '' else 'USER'] } for r in list(set(d[16].split(',')))], 'bearer ' + accessToken)
+    roleMapper = {
+      'ADMIN': {
+        'read': {
+          'name': 'MASTER_ADMIN:READ',
+          'id': '7799a63e-deb3-4536-88b7-459a0a4fddf6',
+          'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10' }, 
+        'write': {
+          'name': 'MASTER_ADMIN:WRITE',
+          'id': 'c4fbb1e3-0f3b-49e3-8326-1c7a1be5667d',
+          'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10' },
+      },
+      'USER': {
+        'read': {
+          'name': 'NORMAL_USER:READ',
+          'id': '1e4089b3-a475-412d-a39b-62da4b87c711',
+          'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10' }, 
+        'write': {
+          'name': 'NORMAL_USER:WRITE',
+          'id': 'cd464a40-83a9-4662-a1d0-aa9f663be36c',
+          'containerId': '8e957834-6be2-4d25-b413-2c56c1f8fc10' },
+      }
+    }
+
+    roleParam = []
+
+    for role in list(set(d[16].split(','))):
+      roleParam.append(roleMapper[role]['read']);
+      roleParam.append(roleMapper[role]['write']);
+
+    addUser(param, roleParam, 'bearer ' + accessToken)
 
 # Call Keycloak Add user api 
 def addUser(param, roles, token):
